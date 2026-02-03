@@ -2,157 +2,109 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>BINGO ONLINE</title>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         :root { --bg: #0f172a; --accent: #f472b6; --blue: #3b82f6; }
-        body { background: var(--bg); color: white; display: flex; flex-direction: column; align-items: center; font-family: 'Segoe UI', sans-serif; margin: 0; min-height: 100vh; overflow-x: hidden; }
-        
-        #main-title { transition: all 0.5s ease; margin-top: 60px; font-size: 3rem; text-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
-        .ingame #main-title { font-size: 1.5rem; margin-top: 15px; opacity: 0.6; }
-
-        #login-screen { text-align: center; margin-top: 40px; }
-        input { padding: 12px; font-size: 1.1rem; border-radius: 8px; border: none; width: 200px; outline: none; }
-        
-        button { padding: 12px 28px; font-size: 1rem; border: none; border-radius: 8px; cursor: pointer; transition: 0.2s; background: var(--blue); color: white; font-weight: bold; }
-        button:active { transform: scale(0.95); }
-        
-        #game-screen { display: none; flex-direction: column; align-items: center; width: 100%; }
-        #player-display { font-size: 1rem; color: #94a3b8; margin-top: 20px; }
-        
-        #status { background: rgba(30, 41, 59, 0.7); padding: 10px 25px; border-radius: 50px; border: 1px solid #334155; margin: 15px 0 25px 0; color: #fbbf24; font-weight: bold; min-width: 200px; text-align: center; }
-
-        .grid { display: grid; grid-template-columns: repeat(5, 70px); gap: 10px; padding: 15px; background: rgba(255,255,255,0.03); border-radius: 15px; margin-top: 10px; }
-        .cell { width: 70px; height: 70px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; cursor: pointer; transition: 0.3s; }
-        .cell.selected { background: var(--accent); box-shadow: 0 0 15px var(--accent); animation: pop 0.3s ease; }
-        
+        body { background: var(--bg); color: white; display: flex; flex-direction: column; align-items: center; font-family: sans-serif; margin: 0; min-height: 100dvh; width: 100vw; overflow-x: hidden; }
+        #login-screen { text-align: center; margin-top: 100px; }
+        input { padding: 12px; font-size: 1.1rem; border-radius: 8px; border: none; width: 200px; margin-bottom: 10px; }
+        button { padding: 12px 28px; font-size: 1rem; border: none; border-radius: 8px; cursor: pointer; background: var(--blue); color: white; font-weight: bold; }
+        #game-screen { display: none; flex-direction: column; align-items: center; width: 100%; flex-grow: 1; padding: 20px 0; }
+        #status { background: rgba(255,255,255,0.1); padding: 10px 20px; border-radius: 50px; margin: 15px 0; color: #fbbf24; font-weight: bold; }
+        .grid { display: grid; grid-template-columns: repeat(5, 18vw); gap: 8px; max-width: 450px; }
+        .cell { aspect-ratio: 1/1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; }
+        .cell.selected { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
         #result-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
-        
-        @keyframes pop { 0% { transform: scale(1); } 50% { transform: scale(1.15); } 100% { transform: scale(1); } }
-        @media (max-width: 400px) { .grid { grid-template-columns: repeat(5, 16vw); } .cell { width: 16vw; height: 16vw; } }
+        @media (min-width: 600px) { .grid { grid-template-columns: repeat(5, 70px); } .cell { width: 70px; height: 70px; } }
     </style>
 </head>
-<body class="">
-    <h1 id="main-title">BINGO ONLINE</h1>
-
+<body>
     <div id="login-screen">
-        <input type="text" id="name-input" placeholder="你的暱稱">
-        <br><br>
-        <button id="join-btn">加入房間</button>
+        <h1>BINGO</h1>
+        <input type="text" id="name-input" placeholder="輸入暱稱">
+        <br><button id="join-btn">加入遊戲</button>
     </div>
 
     <div id="game-screen">
-        <div id="player-display">玩家: </div>
-        <div id="status">等待人數中...</div>
-        <button id="start-btn" style="margin-bottom: 30px;">開始遊戲</button>
+        <div id="status">正在連接...</div>
+        <button id="start-btn" style="display:none">開始遊戲</button>
         <div class="grid" id="bingo"></div>
+        <button onclick="socket.emit('forceReset')" style="margin-top:auto; opacity:0.3; background:none; font-size:0.7rem">重置全體房間</button>
     </div>
 
     <div id="result-overlay">
-        <h1 style="color: gold; font-size: 3rem;">BINGO!</h1>
-        <h2 id="winner-name" style="margin: 20px 0;">贏家</h2>
-        <button id="back-lobby">回到大廳</button>
+        <h1 style="color: gold;">BINGO!</h1>
+        <h2 id="winner-name"></h2>
+        <button onclick="location.reload()">回到大廳</button>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        const socket = io();
+        const socket = io({ transports: ['websocket', 'polling'] });
         const state = { myName: "", myTurn: false, gameStarted: false };
-        
         const dom = {
             login: document.getElementById('login-screen'),
             game: document.getElementById('game-screen'),
-            overlay: document.getElementById('result-overlay'),
             status: document.getElementById('status'),
             board: document.getElementById('bingo'),
-            startBtn: document.getElementById('start-btn')
-        };
-
-        // 載入快取名字
-        window.onload = () => {
-            const saved = localStorage.getItem('bingo-name');
-            if (saved) document.getElementById('name-input').value = saved;
+            startBtn: document.getElementById('start-btn'),
+            overlay: document.getElementById('result-overlay')
         };
 
         document.getElementById('join-btn').onclick = () => {
             state.myName = document.getElementById('name-input').value.trim();
-            if (!state.myName) return alert("請輸入暱稱");
-            localStorage.setItem('bingo-name', state.myName);
-            socket.emit('joinGame', state.myName);
-            dom.login.style.display = 'none';
-            dom.game.style.display = 'flex';
-            document.body.classList.add('ingame');
-            document.getElementById('player-display').textContent = `玩家: ${state.myName}`;
+            if (state.myName) {
+                socket.emit('joinGame', state.myName);
+                dom.login.style.display = 'none';
+                dom.game.style.display = 'flex';
+            }
         };
 
         dom.startBtn.onclick = () => socket.emit('requestStart');
-        
-        document.getElementById('back-lobby').onclick = () => {
-            dom.overlay.style.display = 'none';
-            dom.board.innerHTML = '';
-            socket.emit('requestNewBoard');
-        };
 
-        socket.on('initBoard', (serverBoard) => {
+        socket.on('initBoard', (board) => {
             dom.board.innerHTML = '';
-            serverBoard.forEach(n => {
+            board.forEach(n => {
                 const div = document.createElement('div');
                 div.className = 'cell';
                 div.textContent = n;
-                div.onclick = () => {
-                    if (state.gameStarted && state.myTurn && !div.classList.contains('selected')) {
-                        socket.emit('pickNumber', n);
-                    }
-                };
+                div.onclick = () => { if(state.myTurn) socket.emit('pickNumber', n); };
                 dom.board.appendChild(div);
             });
         });
 
         socket.on('stateUpdate', (data) => {
             state.gameStarted = data.gameStarted;
-            dom.startBtn.style.display = state.gameStarted ? 'none' : 'block';
-            if (state.gameStarted) {
-                state.myTurn = (data.turnId === socket.id);
-                updateStatusText("等待選號...");
+            const onlineCount = data.players.filter(p => p.isOnline).length;
+            if (!state.gameStarted) {
+                dom.status.textContent = `等待中: ${onlineCount}/${data.players.length} 人在線`;
+                dom.startBtn.style.display = (onlineCount >= 2) ? 'block' : 'none';
             } else {
-                dom.status.textContent = `⏳ 等待人數: ${data.playerCount}`;
+                state.myTurn = (data.turnId === socket.id);
+                dom.startBtn.style.display = 'none';
+                const currentName = data.players.find(p => p.id === data.turnId)?.name || "有人";
+                dom.status.textContent = state.myTurn ? "🟢 你的回合！" : `🔴 等待 ${currentName}...`;
             }
         });
 
-        socket.on('timerUpdate', (sec) => {
-            if (state.gameStarted && state.myTurn) {
-                dom.status.textContent = `🟢 你的回合 (${sec}s)`;
-                dom.status.style.color = "#4ade80";
-            } else if (state.gameStarted) {
-                dom.status.textContent = `🔴 對手思考中...`;
-                dom.status.style.color = "white";
-            }
-        });
-
+        socket.on('timerUpdate', (sec) => { if(state.myTurn) dom.status.textContent = `🟢 你的回合 (${sec}s)`; });
         socket.on('updateBoard', (num) => {
-            document.querySelectorAll('.cell').forEach(c => {
-                if (c.textContent == num) c.classList.add('selected');
-            });
+            document.querySelectorAll('.cell').forEach(c => { if(c.textContent == num) c.classList.add('selected'); });
         });
-
         socket.on('rejoinSuccess', (data) => {
             data.pickedNumbers.forEach(num => {
-                document.querySelectorAll('.cell').forEach(c => {
-                    if (c.textContent == num) c.classList.add('selected');
-                });
+                document.querySelectorAll('.cell').forEach(c => { if(c.textContent == num) c.classList.add('selected'); });
             });
         });
-
         socket.on('gameOver', (data) => {
             dom.overlay.style.display = 'flex';
             document.getElementById('winner-name').textContent = `贏家: ${data.winnerNames.join(', ')}`;
-            if (data.winnerNames.includes(state.myName)) {
-                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-            }
+            if (data.winnerNames.includes(state.myName)) confetti({ particleCount: 150, spread: 70 });
         });
-
-        function updateStatusText(text) { dom.status.textContent = text; }
+        socket.on('forceReload', () => location.reload());
+        socket.on('gameStatus', (msg) => alert(msg));
     </script>
 </body>
 </html>

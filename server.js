@@ -5,7 +5,9 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+    cors: { origin: "*" }
+});
 
 let players = []; 
 let currentTurnIndex = 0;
@@ -22,28 +24,20 @@ function generateBoard() {
 
 io.on('connection', (socket) => {
     socket.on('joinGame', (name) => {
-        if (gameStarted) {
-            // 檢查是否是斷線重連
-            let p = players.find(p => p.name === name);
-            if (p) {
-                p.id = socket.id;
-                p.isOnline = true;
-                socket.emit('initBoard', p.board);
-                socket.emit('rejoinSuccess', { pickedNumbers });
-                updateGameState();
-                return;
-            }
-            socket.emit('gameStatus', '遊戲進行中，請稍候...');
-            return;
-        }
-
-        // 正常加入或重連
         let existingPlayer = players.find(p => p.name === name);
+
         if (existingPlayer) {
             existingPlayer.id = socket.id;
             existingPlayer.isOnline = true;
             socket.emit('initBoard', existingPlayer.board);
+            if (gameStarted) {
+                socket.emit('rejoinSuccess', { pickedNumbers });
+            }
         } else {
+            if (gameStarted) {
+                socket.emit('gameStatus', '遊戲進行中，請等下一局');
+                return;
+            }
             const playerBoard = generateBoard();
             players.push({ 
                 id: socket.id, 
@@ -63,31 +57,29 @@ io.on('connection', (socket) => {
             pickedNumbers = [];
             io.emit('gameStatus', '遊戲正式開始！');
             updateGameState(); 
-            const firstPlayer = players[currentTurnIndex];
-            if (firstPlayer) startAutoPickTimer(firstPlayer); 
-        } else {
-            socket.emit('gameStatus', `人數不足 (目前: ${players.length}/2)`);
+            startAutoPickTimer(players[currentTurnIndex]); 
         }
     });
 
     socket.on('pickNumber', (num) => {
-        if (!gameStarted) return;
-        if (players[currentTurnIndex]?.id !== socket.id) return;
+        if (!gameStarted || players[currentTurnIndex]?.id !== socket.id) return;
         executePick(num);
     });
 
-    socket.on('requestNewBoard', () => {
-        const player = players.find(p => p.id === socket.id);
-        if (player) {
-            player.board = generateBoard();
-            socket.emit('initBoard', player.board);
-        }
+    socket.on('forceReset', () => {
+        players = [];
+        gameStarted = false;
+        pickedNumbers = [];
+        if (pauseTimer) clearTimeout(pauseTimer);
+        if (countdown) clearInterval(countdown);
+        io.emit('forceReload');
     });
 
     socket.on('disconnect', () => {
         const player = players.find(p => p.id === socket.id);
-        if (player) player.isOnline = false;
-        // 如果全員離線超過 30 秒才清空 (選配邏輯，這裡簡化為不自動清空以方便重連)
+        if (player) {
+            player.isOnline = false;
+        }
         updateGameState();
     });
 });
@@ -108,7 +100,6 @@ function executePick(num) {
         if (winners.length > 0) {
             gameStarted = false;
             io.emit('gameOver', { winnerNames: winners.map(w => w.name) });
-            resetGameState();
             return;
         }
         nextTurn(); 
@@ -118,25 +109,25 @@ function executePick(num) {
 function nextTurn() {
     if (!gameStarted) return;
     currentTurnIndex = (currentTurnIndex + 1) % players.length;
+    // 如果輪到的玩家斷線了，自動跳過他或幫他選
     startAutoPickTimer(players[currentTurnIndex]);
     updateGameState();
 }
 
 function startAutoPickTimer(player) {
     if (!player || !gameStarted) return;
-    if (pauseTimer) clearTimeout(pauseTimer);
-    if (countdown) clearInterval(countdown);
-
     let timeLeft = 10;
     io.emit('timerUpdate', timeLeft);
+    
+    if (countdown) clearInterval(countdown);
     countdown = setInterval(() => {
         timeLeft--;
         io.emit('timerUpdate', timeLeft);
         if (timeLeft <= 0) clearInterval(countdown);
     }, 1000);
 
+    if (pauseTimer) clearTimeout(pauseTimer);
     pauseTimer = setTimeout(() => {
-        if (!gameStarted) return;
         const available = player.board.filter(n => !pickedNumbers.includes(n));
         if (available.length > 0) {
             executePick(available[Math.floor(Math.random() * available.length)]);
@@ -156,19 +147,11 @@ function checkBingo(board, picked) {
     return lines;
 }
 
-function resetGameState() {
-    gameStarted = false;
-    pickedNumbers = [];
-    if (pauseTimer) clearTimeout(pauseTimer);
-    if (countdown) clearInterval(countdown);
-    updateGameState();
-}
-
 function updateGameState() {
     io.emit('stateUpdate', {
         gameStarted: gameStarted,
         turnId: players[currentTurnIndex]?.id,
-        playerCount: players.filter(p => p.isOnline).length
+        players: players.map(p => ({ name: p.name, isOnline: p.isOnline, id: p.id }))
     });
 }
 
