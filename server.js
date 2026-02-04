@@ -134,7 +134,7 @@ function nextTurn() {
 
 function startAutoPickTimer(player) {
     if (!player || !gameStarted) return;
-    let timeLeft = 20;
+    let timeLeft = 10;
     io.emit('timerUpdate', timeLeft);
     
     if (countdown) clearInterval(countdown);
@@ -150,7 +150,7 @@ function startAutoPickTimer(player) {
         if (available.length > 0) {
             executePick(available[Math.floor(Math.random() * available.length)]);
         }
-    }, 20000);
+    }, 10000);
 }
 
 function checkBingo(board, picked) {
@@ -174,4 +174,5 @@ function updateGameState() {
 }
 
 const PORT = process.env.PORT || 3000;
+
 server.listen(PORT, () => console.log(`Server is running!`));
