@@ -8,42 +8,51 @@
     <style>
         :root { --bg: #0f172a; --accent: #f472b6; --blue: #3b82f6; }
         body { background: var(--bg); color: white; display: flex; flex-direction: column; align-items: center; font-family: sans-serif; margin: 0; min-height: 100dvh; width: 100vw; overflow-x: hidden; }
-        #login-screen { text-align: center; margin-top: 100px; }
+        
+        h1 { margin-top: 40px; font-size: 2.5rem; text-shadow: 0 0 10px var(--blue); }
+        #login-screen { text-align: center; margin-top: 50px; }
         input { padding: 12px; font-size: 1.1rem; border-radius: 8px; border: none; width: 200px; margin-bottom: 10px; }
-        button { padding: 12px 28px; font-size: 1rem; border: none; border-radius: 8px; cursor: pointer; background: var(--blue); color: white; font-weight: bold; }
-        #game-screen { display: none; flex-direction: column; align-items: center; width: 100%; flex-grow: 1; padding: 20px 0; }
-        #status { background: rgba(255,255,255,0.1); padding: 10px 20px; border-radius: 50px; margin: 15px 0; color: #fbbf24; font-weight: bold; }
-        .grid { display: grid; grid-template-columns: repeat(5, 18vw); gap: 8px; max-width: 450px; }
+        
+        button { padding: 12px 28px; font-size: 1rem; border: none; border-radius: 8px; cursor: pointer; background: var(--blue); color: white; font-weight: bold; transition: 0.2s; }
+        button:active { transform: scale(0.95); }
+        
+        #game-screen { display: none; flex-direction: column; align-items: center; width: 100%; flex-grow: 1; padding: 10px 0; }
+        #status { background: rgba(255,255,255,0.1); padding: 8px 18px; border-radius: 50px; margin: 10px 0; color: #fbbf24; font-weight: bold; font-size: 0.9rem; }
+        
+        .grid { display: grid; grid-template-columns: repeat(5, 17vw); gap: 6px; max-width: 400px; margin-bottom: 15px; }
         .cell { aspect-ratio: 1/1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; }
-        .cell.selected { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+        .cell.selected { background: var(--accent); box-shadow: 0 0 10px var(--accent); border: none; }
+        
         #result-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.9); flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
-        @media (min-width: 600px) { .grid { grid-template-columns: repeat(5, 70px); } .cell { width: 70px; height: 70px; } }
     </style>
 </head>
 <body>
+    <h1 id="game-title">BINGO</h1>
+
     <div id="login-screen">
-        <h1>BINGO</h1>
         <input type="text" id="name-input" placeholder="輸入暱稱">
         <br><button id="join-btn">加入遊戲</button>
     </div>
 
     <div id="game-screen">
         <div id="status">正在連接...</div>
-        <button id="start-btn" style="display:none">開始遊戲</button>
+        <button id="start-btn" style="display:none; margin-bottom: 10px;">開始遊戲</button>
         <div class="grid" id="bingo"></div>
-        <button onclick="socket.emit('forceReset')" style="margin-top:auto; opacity:0.3; background:none; font-size:0.7rem">重置全體房間</button>
+        <button id="exit-btn" style="background:#475569; margin-top: 15px; font-size: 0.8rem;">離開並回大廳</button>
     </div>
 
     <div id="result-overlay">
         <h1 style="color: gold;">BINGO!</h1>
         <h2 id="winner-name"></h2>
-        <button onclick="location.reload()">回到大廳</button>
+        <button id="back-home-btn">回到大廳</button>
+    </div>
+    <div id="leaderboard" style="margin-top: 20px; width: 80%; background: rgba(255,255,255,0.05); padding: 10px; border-radius: 10px; font-size: 0.9rem;">
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        const socket = io({ transports: ['websocket', 'polling'] });
-        const state = { myName: "", myTurn: false, gameStarted: false };
+        const socket = io({ transports: ['websocket'] });
+        let state = { myName: "", myTurn: false, gameStarted: false };
         const dom = {
             login: document.getElementById('login-screen'),
             game: document.getElementById('game-screen'),
@@ -62,6 +71,14 @@
             }
         };
 
+        // 離開大廳邏輯：告知伺服器刪除資料，並重新整理網頁
+        const leaveLobby = () => {
+            socket.emit('leaveGame');
+            location.reload(); 
+        };
+
+        document.getElementById('exit-btn').onclick = leaveLobby;
+        document.getElementById('back-home-btn').onclick = leaveLobby;
         dom.startBtn.onclick = () => socket.emit('requestStart');
 
         socket.on('initBoard', (board) => {
@@ -87,9 +104,18 @@
                 const currentName = data.players.find(p => p.id === data.turnId)?.name || "有人";
                 dom.status.textContent = state.myTurn ? "🟢 你的回合！" : `🔴 等待 ${currentName}...`;
             }
+            // 更新即時戰況清單
+            const leaderboardHtml = data.players
+                .sort((a, b) => b.lineCount - a.lineCount) // 依連線數排序
+                .map(p => `
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px; color: ${p.isOnline ? '#fff' : '#666'}">
+                        <span>${p.isOnline ? '🟢' : '⚪'} ${p.name}</span>
+                        <span style="color: #f472b6; font-weight:bold;">${p.lineCount} 條線</span>
+                    </div>
+                `).join('');
+            document.getElementById('leaderboard').innerHTML = leaderboardHtml;
         });
 
-        socket.on('timerUpdate', (sec) => { if(state.myTurn) dom.status.textContent = `🟢 你的回合 (${sec}s)`; });
         socket.on('updateBoard', (num) => {
             document.querySelectorAll('.cell').forEach(c => { if(c.textContent == num) c.classList.add('selected'); });
         });
@@ -104,7 +130,7 @@
             if (data.winnerNames.includes(state.myName)) confetti({ particleCount: 150, spread: 70 });
         });
         socket.on('forceReload', () => location.reload());
-        socket.on('gameStatus', (msg) => alert(msg));
+        socket.on('timerUpdate', (sec) => { if(state.myTurn) dom.status.textContent = `🟢 你的回合 (${sec}s)`; });
     </script>
 </body>
 </html>

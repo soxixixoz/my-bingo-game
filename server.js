@@ -19,7 +19,9 @@ let countdown = null;
 app.use(express.static(path.join(__dirname)));
 
 function generateBoard() {
-    return Array.from({length: 25}, (_, i) => i + 1).sort(() => Math.random() - 0.5);
+    // 從 1 到 75 中隨機選出 25 個數字
+    const pool = Array.from({length: 75}, (_, i) => i + 1);
+    return pool.sort(() => Math.random() - 0.5).slice(0, 25);
 }
 
 io.on('connection', (socket) => {
@@ -131,7 +133,7 @@ function nextTurn() {
 
 function startAutoPickTimer(player) {
     if (!player || !gameStarted) return;
-    let timeLeft = 10;
+    let timeLeft = 20;
     io.emit('timerUpdate', timeLeft);
     
     if (countdown) clearInterval(countdown);
@@ -147,7 +149,7 @@ function startAutoPickTimer(player) {
         if (available.length > 0) {
             executePick(available[Math.floor(Math.random() * available.length)]);
         }
-    }, 10000);
+    }, 20000);
 }
 
 function checkBingo(board, picked) {
