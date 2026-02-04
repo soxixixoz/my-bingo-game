@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const { listenerCount } = require('cluster');
 
 const app = express();
 const server = http.createServer(app);
@@ -168,7 +169,7 @@ function updateGameState() {
     io.emit('stateUpdate', {
         gameStarted: gameStarted,
         turnId: players[currentTurnIndex]?.id,
-        players: players.map(p => ({ name: p.name, isOnline: p.isOnline, id: p.id }))
+        players: players.map(p => ({ name: p.name, isOnline: p.isOnline, id: p.id, lineCount: checkBingo(p.board, pickedNumbers) }))
     });
 }
 
