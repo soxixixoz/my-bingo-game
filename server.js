@@ -48,6 +48,21 @@ io.on('connection', (socket) => {
             socket.emit('initBoard', playerBoard);
         }
         updateGameState();
+     socket.on('leaveGame', () => {
+        players = players.filter(p => p.id !== socket.id);
+        updateGameState();
+});
+
+// 並確保斷線時，如果是還沒開始遊戲，就直接刪除
+    socket.on('disconnect', () => {
+        const player = players.find(p => p.id === socket.id);
+        if (player && !gameStarted) {
+            players = players.filter(p => p.id !== socket.id);
+        } else if (player) {
+            player.isOnline = false;
+    }
+    updateGameState();
+});   
     });
 
     socket.on('requestStart', () => {
