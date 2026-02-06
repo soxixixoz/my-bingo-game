@@ -112,7 +112,7 @@ function executePick(num) {
 
         let winners = [];
         players.forEach(p => {
-            if (checkBingo(p.board, pickedNumbers) >= 5) winners.push(p);
+            if (checkBingo(p.board, pickedNumbers) >= 7) winners.push(p);
         });
 
         if (winners.length > 0) {
@@ -176,3 +176,4 @@ function updateGameState() {
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => console.log(`Server is running!`));
+
